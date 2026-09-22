@@ -68,44 +68,35 @@ def normalize_holehe(item):
 
 
 async def run_holehe(email: str, timeout: int = 90):
-    """Run Holehe modules as a Python library and retain their dictionaries."""
+    """Use Holehe core's loader and launch_module contract."""
     try:
         import httpx
         import trio
-        import holehe.modules
+        from holehe.core import import_submodules, get_functions, launch_module
     except ImportError as exc:
         return {"status": "unavailable", "results": [], "message": f"Holehe library unavailable: {exc}"}
 
     async def collect():
-        results = []
-        async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
-            modules = sorted(pkgutil.iter_modules(holehe.modules.__path__), key=lambda x: x.name)
-            for module_info in modules:
-                if module_info.name.startswith("_"):
-                    continue
-                try:
-                    module = importlib.import_module(f"holehe.modules.{module_info.name}")
-                    callback = getattr(module, module_info.name, None)
-                    if callback is None:
-                        callbacks = [v for v in vars(module).values() if inspect.iscoroutinefunction(v) and v.__module__ == module.__name__]
-                        callback = callbacks[0] if callbacks else None
-                    if callback is None:
-                        continue
-                    value = await callback(email, client)
-                    normalized = normalize_holehe(value)
-                    if normalized:
-                        results.append(normalized)
-                except Exception:
-                    continue
-        return results
+        modules = import_submodules("holehe.modules")
+        websites = get_functions(modules)
+        out = []
+        client = httpx.AsyncClient(timeout=20, follow_redirects=True)
+        try:
+            async with trio.open_nursery() as nursery:
+                for website in websites:
+                    nursery.start_soon(launch_module, website, email, client, out)
+        finally:
+            await client.aclose()
+        return sorted(out, key=lambda item: str(item.get("name", item.get("domain", ""))))
 
     try:
-        results = await asyncio.wait_for(asyncio.to_thread(trio.run, collect), timeout=timeout)
-        return {"status": "ok", "results": results}
+        raw_results = await asyncio.wait_for(asyncio.to_thread(trio.run, collect), timeout=timeout)
+        results = [normalized for item in raw_results if (normalized := normalize_holehe(item))]
+        return {"status": "ok", "results": results, "checked": len(raw_results)}
     except asyncio.TimeoutError:
         return {"status": "timeout", "results": [], "message": "Lookup timed out."}
     except Exception as exc:
-        return {"status": "error", "results": [], "message": f"Holehe lookup failed: {exc}"}
+        return {"status": "error", "results": [], "message": f"Holehe lookup failed: {type(exc).__name__}: {exc}"}
 
 
 async def run_command(command: list[str], timeout: int = 90) -> dict:
