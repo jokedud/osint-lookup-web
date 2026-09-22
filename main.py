@@ -1,6 +1,4 @@
 import asyncio
-import json
-import os
 import re
 from typing import Literal
 
@@ -9,7 +7,10 @@ from fastapi.responses import HTMLResponse
 
 app = FastAPI(title="OSINT Lookup", version="1.0.0")
 
-EMAIL_RE = re.compile(r"^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
+# Deliberately lightweight validation: holehe performs the actual verification.
+# This accepts normal addresses such as username@gmail.com without trying to
+# implement the full RFC email grammar in the web layer.
+EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
