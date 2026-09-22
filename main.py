@@ -8,8 +8,6 @@ from fastapi.responses import HTMLResponse
 app = FastAPI(title="OSINT Lookup", version="1.0.0")
 
 # Deliberately lightweight validation: holehe performs the actual verification.
-# This accepts normal addresses such as username@gmail.com without trying to
-# implement the full RFC email grammar in the web layer.
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
@@ -53,7 +51,9 @@ async def search(
     if detected == "email":
         if not EMAIL_RE.fullmatch(query):
             raise HTTPException(status_code=400, detail="Enter a valid email address.")
-        result = await run_command(["holehe", "--json", query])
+        # Holehe accepts the email as a positional argument; it has no --json flag.
+        # The normal CLI output is captured and returned as result lines.
+        result = await run_command(["holehe", query])
         engine = "Holehe"
     else:
         if not USERNAME_RE.fullmatch(query):
