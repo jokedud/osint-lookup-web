@@ -93,19 +93,25 @@ function pivotFor(res) {
   return out;
 }
 
-function render() {
+function filteredResults() {
   const foundOnly = $("foundOnly").checked;
   const filter = $("filter").value.toLowerCase();
   const disabledTools = new Set(
     [...document.querySelectorAll(".tool-toggle")]
       .filter((c) => !c.checked).map((c) => c.dataset.tool)
   );
+  return results.filter((r) => {
+    if (foundOnly && r.status !== "found" && r.status !== "info") return false;
+    if (disabledTools.has(r.source)) return false;
+    if (filter && !String(r.site).toLowerCase().includes(filter)) return false;
+    return true;
+  });
+}
+
+function render() {
   const tbody = $("tbody");
   tbody.innerHTML = "";
-  for (const r of results) {
-    if (foundOnly && r.status !== "found" && r.status !== "info") continue;
-    if (disabledTools.has(r.source)) continue;
-    if (filter && !String(r.site).toLowerCase().includes(filter)) continue;
+  for (const r of filteredResults()) {
     const tr = document.createElement("tr");
     tr.innerHTML =
       `<td>${esc(r.site)}${pivotFor(r)}</td>` +
@@ -221,14 +227,17 @@ function download(name, content, type) {
   URL.revokeObjectURL(a.href);
 }
 
-$("exportJson").onclick = () =>
-  download(`osint_${currentType}_${currentQuery}.json`,
-    JSON.stringify(results, null, 2), "application/json");
+$("exportJson").onclick = () => {
+  const rows = filteredResults();
+  download(`osint_${currentType}_${currentQuery}_${rows.length}of${results.length}.json`,
+    JSON.stringify(rows, null, 2), "application/json");
+};
 
 $("exportCsv").onclick = () => {
+  const data = filteredResults();
   const csvEsc = (s) => `"${String(s ?? "").replace(/"/g, '""')}"`;
   const rows = [["source", "category", "site", "status", "url", "details"]];
-  for (const r of results)
+  for (const r of data)
     rows.push([r.source, r.category, r.site, r.status, r.url || "", JSON.stringify(r.details)]);
   download(`osint_${currentType}_${currentQuery}.csv`,
     rows.map((r) => r.map(csvEsc).join(",")).join("\n"), "text/csv");
