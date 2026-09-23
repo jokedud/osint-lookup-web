@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OSINT Hub</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1>OSINT Hub</h1>
+  <p class="tagline">Discover accounts linked to an email, username, or phone number.</p>
+</header>
+
+<div class="layout">
+  <aside id="sidebar">
+    <h2>History</h2>
+    <ul id="history"></ul>
+  </aside>
+
+  <main>
+    <section class="scan-bar">
+      <input id="query" type="text" placeholder="email@example.com, username, or +14155552671" autofocus>
+      <select id="type">
+        <option value="auto">Auto</option>
+        <option value="email">Email</option>
+        <option value="username">Username</option>
+        <option value="phone">Phone</option>
+      </select>
+      <button id="scanBtn">Scan</button>
+    </section>
+
+    <div id="progress" class="hidden"><div class="bar"></div></div>
+
+    <section id="summary" class="chips"></section>
+
+    <section class="controls">
+      <label><input type="checkbox" id="foundOnly" checked> Found only</label>
+      <input id="filter" type="text" placeholder="Filter sites…">
+      <span id="toolToggles"></span>
+      <button id="exportJson">Export JSON</button>
+      <button id="exportCsv">Export CSV</button>
+      <button id="pivotUsername" class="hidden"></button>
+    </section>
+
+    <table id="results">
+      <thead>
+        <tr><th>Site</th><th>Tool</th><th>Status</th><th>Link</th><th>Details</th></tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </main>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

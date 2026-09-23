@@ -1,0 +1,6 @@
+.env
+__pycache__/
+reports/
+*.pyc
+creds.m
+.malfrats/
