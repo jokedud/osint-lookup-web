@@ -71,9 +71,7 @@ async def _counted_pump(scanners, queue, counter, category):
 async def scan_email(email: str = Query(...)):
     email = email.strip().lower()
     if not email or not EMAIL_RE.match(email):
-        return StreamingResponse(
-            iter([b'data: {"detail": "invalid email"}\n\n']),
-            status_code=400, media_type="text/event-stream")
+        raise HTTPException(status_code=400, detail="invalid email")
     return _sse([
         email_basic.scan(email),
         email_holehe.scan(email),
@@ -87,9 +85,7 @@ async def scan_email(email: str = Query(...)):
 async def scan_username(username: str = Query(..., min_length=1, max_length=64)):
     username = username.strip()
     if not username or "@" in username:
-        return StreamingResponse(
-            iter([b'data: {"detail": "invalid username"}\n\n']),
-            status_code=400, media_type="text/event-stream")
+        raise HTTPException(status_code=400, detail="invalid username")
     return _sse([
         username_maigret.scan(username),
         username_sherlock.scan(username),
@@ -100,7 +96,5 @@ async def scan_username(username: str = Query(..., min_length=1, max_length=64))
 async def scan_phone(number: str = Query(..., min_length=3, max_length=20)):
     number = number.strip()
     if not re.fullmatch(r"\+?[\d\s().-]+", number):
-        return StreamingResponse(
-            iter([b'data: {"detail": "invalid phone number"}\n\n']),
-            status_code=400, media_type="text/event-stream")
+        raise HTTPException(status_code=400, detail="invalid phone number")
     return _sse([phone.scan(number)], "phone")

@@ -53,6 +53,17 @@ function showTokenBox() {
   $("tokenInput").focus();
 }
 
+function showError(msg) {
+  const el = $("scanError");
+  el.textContent = msg;
+  el.classList.remove("hidden");
+}
+
+function clearError() {
+  $("scanError").classList.add("hidden");
+  $("scanError").textContent = "";
+}
+
 function saveHistory(q, t) {
   let h = JSON.parse(localStorage.getItem("osint_history") || "[]");
   h = h.filter((e) => !(e.q === q && e.t === t));
@@ -170,6 +181,11 @@ function startScan() {
   if (!q) return;
   let t = $("type").value;
   if (t === "auto") t = detectType(q);
+  if (t === "email" && !q.includes("@")) {
+    showError("Email addresses must contain '@'.");
+    return;
+  }
+  clearError();
   currentType = t; currentQuery = q;
 
   if (es) es.close();
@@ -185,6 +201,7 @@ function startScan() {
   const token = getToken();
   if (token) url += `&token=${encodeURIComponent(token)}`;
 
+  let finished = false;
   es = new EventSource(url);
   es.onmessage = (ev) => {
     let res;
@@ -195,6 +212,7 @@ function startScan() {
     render();
   };
   es.addEventListener("done", (ev) => {
+    finished = true;
     $("progress").classList.add("hidden");
     try { renderChips(JSON.parse(ev.data)); } catch { renderChips(); }
     saveHistory(q, t);
@@ -209,13 +227,34 @@ function startScan() {
     }
     es.close();
   });
-  es.onerror = () => {
+  es.onerror = async () => {
+    if (finished) return;
     $("progress").classList.add("hidden");
-    // EventSource fires onerror for any connection failure, including HTTP 401.
-    if (es.readyState === EventSource.CLOSED && !getToken()) {
-      showTokenBox();
-    }
     es.close();
+    // EventSource gives no status code; probe the same URL to learn why.
+    try {
+      const headers = {};
+      const token = getToken();
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      // Probe without the token query param to distinguish 401 from 400.
+      const probeUrl = url.replace(/([?&])token=[^&]+&?/, "$1").replace(/[?&]$/, "");
+      const resp = await fetch(probeUrl, { headers });
+      if (resp.status === 401) {
+        showTokenBox();
+        showError("Access token required.");
+      } else if (resp.status === 400) {
+        let detail = "Invalid input.";
+        try {
+          const body = await resp.json();
+          if (body && body.detail) detail = String(body.detail);
+        } catch { }
+        showError(detail);
+      } else {
+        showError("Connection lost.");
+      }
+    } catch {
+      showError("Connection lost.");
+    }
   };
 }
 
