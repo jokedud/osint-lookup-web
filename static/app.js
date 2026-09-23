@@ -238,7 +238,9 @@ function startScan() {
       if (token) headers["Authorization"] = `Bearer ${token}`;
       // Probe without the token query param to distinguish 401 from 400.
       const probeUrl = url.replace(/([?&])token=[^&]+&?/, "$1").replace(/[?&]$/, "");
-      const resp = await fetch(probeUrl, { headers });
+      const ctrl = new AbortController();
+      const resp = await fetch(probeUrl, { headers, signal: ctrl.signal });
+      if (resp.ok) ctrl.abort();
       if (resp.status === 401) {
         showTokenBox();
         showError("Access token required.");
