@@ -1,6 +1,9 @@
 fastapi
 uvicorn[standard]
-holehe
 httpx
-trio
+holehe
+maigret
 sherlock-project
+ghunt
+dnspython
+phonenumbers
