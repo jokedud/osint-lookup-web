@@ -10,3 +10,5 @@ services:
         value: "3.12"
       - key: HIBP_API_KEY
         sync: false
+      - key: ACCESS_TOKEN
+        sync: false

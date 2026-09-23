@@ -2,7 +2,9 @@ import asyncio
 import json
 import re
 
-from fastapi import APIRouter, Query
+import os
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from .models import Result
@@ -10,16 +12,30 @@ from .scanners import (email_basic, email_custom, email_ghunt, email_hibp,
                        email_holehe, phone, username_maigret,
                        username_sherlock)
 
-router = APIRouter(prefix="/api")
+ACCESS_TOKEN = os.environ.get("ACCESS_TOKEN")
+
+
+def require_token(request: Request):
+    if not ACCESS_TOKEN:
+        return
+    auth = request.headers.get("authorization", "")
+    token = request.query_params.get("token")
+    if auth == f"Bearer {ACCESS_TOKEN}" or token == ACCESS_TOKEN:
+        return
+    raise HTTPException(status_code=401, detail="access token required")
+
+
+router = APIRouter(prefix="/api", dependencies=[Depends(require_token)])
 
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 
 
-def _sse(scanners):
+def _sse(scanners, category):
     async def gen():
         queue = asyncio.Queue()
         counter = {"total": 0}
-        pump = asyncio.create_task(_counted_pump(scanners, queue, counter))
+        pump = asyncio.create_task(
+            _counted_pump(scanners, queue, counter, category))
         try:
             while True:
                 item = await queue.get()
@@ -34,7 +50,7 @@ def _sse(scanners):
                                       "X-Accel-Buffering": "no"})
 
 
-async def _counted_pump(scanners, queue, counter):
+async def _counted_pump(scanners, queue, counter, category):
     async def worker(scan_agen):
         try:
             async for res in scan_agen:
@@ -44,7 +60,7 @@ async def _counted_pump(scanners, queue, counter):
         except Exception as exc:
             counter["error"] = counter.get("error", 0) + 1
             await queue.put(Result(
-                source="scanner", category="email", site="internal",
+                source="scanner", category=category, site="internal",
                 status="error", details={"error": str(exc)}))
     await asyncio.gather(*[asyncio.create_task(worker(s)) for s in scanners],
                          return_exceptions=True)
@@ -64,7 +80,7 @@ async def scan_email(email: str = Query(...)):
         email_custom.scan(email),
         email_hibp.scan(email),
         email_ghunt.scan(email),
-    ])
+    ], "email")
 
 
 @router.get("/scan/username")
@@ -77,7 +93,7 @@ async def scan_username(username: str = Query(..., min_length=1, max_length=64))
     return _sse([
         username_maigret.scan(username),
         username_sherlock.scan(username),
-    ])
+    ], "username")
 
 
 @router.get("/scan/phone")
@@ -87,4 +103,4 @@ async def scan_phone(number: str = Query(..., min_length=3, max_length=20)):
         return StreamingResponse(
             iter([b'data: {"detail": "invalid phone number"}\n\n']),
             status_code=400, media_type="text/event-stream")
-    return _sse([phone.scan(number)])
+    return _sse([phone.scan(number)], "phone")

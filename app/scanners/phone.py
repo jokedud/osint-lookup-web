@@ -58,5 +58,5 @@ async def scan(number: str):
     ]
     for site, url in links:
         yield Result(source="phonenumbers", category="phone", site=site,
-                     status="found", url=url,
+                     status="info", url=url,
                      details={"message": "Lookup link (verification required)"})

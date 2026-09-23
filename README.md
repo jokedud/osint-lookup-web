@@ -32,6 +32,10 @@ Open http://localhost:8000
 Copy `.env.example` to `.env` or set environment variables directly:
 
 - `HIBP_API_KEY` — enables HaveIBeenPwned breach lookups.
+- `ACCESS_TOKEN` — if set, all `/api/*` endpoints require
+  `Authorization: Bearer <token>` or a `?token=<token>` query param (the UI
+  shows an access-token box and appends it automatically); unset means open
+  access. Recommended on any public deployment.
 - GHunt — run `ghunt login` once to store Google credentials
   (`~/.malfrats/ghunt/creds.m`); email scans then include Google account data
   (Gaia ID, profile photo, Maps reviews, etc.).

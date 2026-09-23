@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -42,13 +43,18 @@ async def scan(email: str):
                                 "to configure Google authentication."})
         return
 
-    tmp = Path(tempfile.gettempdir()) / f"ghunt_{abs(hash(email))}.json"
+    tmpf = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+    tmp = Path(tmpf.name)
+    tmpf.close()
     try:
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-m", "ghunt", "email", email,
-            "--json", str(tmp),
+            sys.executable, "-c",
+            "import sys; from ghunt.ghunt import main; "
+            "sys.argv=['ghunt']+sys.argv[1:]; main()",
+            "email", email, "--json", str(tmp),
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.PIPE,
+            env={**os.environ, "PYTHONUTF8": "1"},
         )
         try:
             _, stderr = await asyncio.wait_for(proc.communicate(),
