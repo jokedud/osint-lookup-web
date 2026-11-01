@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 from typing import Literal
 import httpx
@@ -8,9 +9,10 @@ from fastapi.responses import HTMLResponse
 from holehe.core import import_submodules, get_functions, launch_module
 from custom_checks import run_custom_checks
 
+logger = logging.getLogger("osint_lookup")
 app = FastAPI(title="OSINT Lookup", version="2.1.0")
-EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]{1,64}@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$")
+USERNAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 URL_RE = re.compile(r"https?://[^\s)]+", re.I)
 
 def clean_url(value):
@@ -42,27 +44,34 @@ async def run_holehe(email: str, timeout: int = 90):
         modules = import_submodules("holehe.modules"); websites, out = get_functions(modules), []
         client = httpx.AsyncClient(timeout=20, follow_redirects=True)
         try:
-            async with trio.open_nursery() as nursery:
-                for website in websites: nursery.start_soon(launch_module, website, email, client, out)
+            with trio.move_on_after(timeout) as scope:
+                async with trio.open_nursery() as nursery:
+                    for website in websites: nursery.start_soon(launch_module, website, email, client, out)
         finally: await client.aclose()
+        if scope.cancelled_caught: raise asyncio.TimeoutError
         return sorted(out, key=lambda x: str(x.get("name", x.get("domain", ""))))
     try:
-        raw = await asyncio.wait_for(asyncio.to_thread(trio.run, collect), timeout=timeout)
+        raw = await asyncio.wait_for(asyncio.to_thread(trio.run, collect), timeout=timeout + 15)
         combined = raw + await run_custom_checks(email); results, seen = [], set()
         for item in combined:
             result = normalize_holehe(item)
             if result and result["platform"] not in seen: seen.add(result["platform"]); results.append(result)
         return {"status": "ok", "results": results, "checked": len(raw), "custom_checked": 3}
     except asyncio.TimeoutError: return {"status": "timeout", "results": [], "message": "Lookup timed out."}
-    except Exception as exc: return {"status": "error", "results": [], "message": f"Holehe lookup failed: {type(exc).__name__}: {exc}"}
+    except Exception:
+        logger.exception("Holehe lookup failed")
+        return {"status": "error", "results": [], "message": "Lookup failed."}
 
 async def run_command(command: list[str], timeout: int = 90):
     try:
         p = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE); stdout, stderr = await asyncio.wait_for(p.communicate(), timeout=timeout)
     except asyncio.TimeoutError: p.kill(); await p.wait(); return {"status": "timeout", "results": [], "message": "Lookup timed out."}
-    except FileNotFoundError: return {"status": "unavailable", "results": [], "message": f"Lookup engine is not installed: {command[0]}"}
+    except FileNotFoundError:
+        logger.error("Lookup engine is not installed: %s", command[0])
+        return {"status": "unavailable", "results": [], "message": "Lookup engine is unavailable."}
     lines = [x.strip() for x in stdout.decode(errors="replace").splitlines() if x.strip()]
-    return {"status": "ok" if p.returncode == 0 else "completed_with_warnings", "lines": lines, "stderr": stderr.decode(errors="replace")[-2000:] or None}
+    if stderr: logger.warning("%s stderr: %s", command[0], stderr.decode(errors="replace")[-2000:])
+    return {"status": "ok" if p.returncode == 0 else "completed_with_warnings", "lines": lines}
 
 @app.get("/api/search")
 async def search(type: Literal["username", "email", "auto"] = Query("auto"), query: str = Query(..., min_length=1, max_length=320)):
@@ -71,7 +80,7 @@ async def search(type: Literal["username", "email", "auto"] = Query("auto"), que
         if not EMAIL_RE.fullmatch(query): raise HTTPException(400, "Enter a valid email address.")
         return {"query": query, "type": detected, "engine": "Holehe + custom checks", **await run_holehe(query)}
     if not USERNAME_RE.fullmatch(query): raise HTTPException(400, "Use a username with letters, numbers, dots, underscores, or hyphens.")
-    raw = await run_command(["sherlock", query, "--print-found", "--no-color"]); lines = raw.pop("lines", [])
+    raw = await run_command(["sherlock", "--print-found", "--no-color", "--", query]); lines = raw.pop("lines", [])
     raw["results"] = [{"platform": "Sherlock output", "status": "found", "label": "Results", "url": clean_url(x), "phone": None, "recovery_email": None, "detail": x} for x in lines]
     return {"query": query, "type": detected, "engine": "Sherlock", **raw}
 
