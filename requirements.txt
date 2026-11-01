@@ -1,6 +1,6 @@
-fastapi
-uvicorn[standard]
-holehe
-httpx
-trio
-sherlock-project
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+holehe==1.61
+httpx==0.28.1
+trio==0.35.0
+sherlock-project==0.16.2
