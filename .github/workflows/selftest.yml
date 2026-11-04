@@ -1,0 +1,26 @@
+name: Daily email check self-test
+
+on:
+  schedule:
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run self-test on the deployed app
+        run: |
+          # Render's free tier sleeps; the first request wakes it.
+          curl -s -o /dev/null --max-time 120 https://osint-lookup-web.onrender.com/ || true
+          code=$(curl -s -o report.json -w '%{http_code}' --max-time 180 https://osint-lookup-web.onrender.com/api/selftest)
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          r = json.load(open("report.json"))
+          print(f"**{r['passed']}/{r['total']} email checks working**\n")
+          print("| Check | Result | Problem |\n|---|---|---|")
+          for row in r["results"]:
+              print(f"| {row['check']} | {'pass' if row['ok'] else 'BROKEN'} | {row['problem'] or ''} |")
+          PY
+          cat "$GITHUB_STEP_SUMMARY"
+          test "$code" = "200"

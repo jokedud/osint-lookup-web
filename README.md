@@ -2,8 +2,12 @@
 
 FastAPI app that checks where an email or username is registered.
 
-- Email: [Holehe](https://github.com/megadose/holehe), [GHunt](https://github.com/mxrch/GHunt) (public Google account info: Gaia ID, profile photo, last profile edit, Maps contributions, public Calendar, Play Games), and custom checks in `custom_checks.py`.
-- Username: [Sherlock](https://github.com/sherlock-project/sherlock).
+- Email: our own checks in `email_checks.py` (18 sites: Adobe, Atlassian, Chess.com, Codecademy, Duolingo, Firefox, Gravatar, HubSpot, Komoot, LastPass, Microsoft, Snapchat, Spotify, Tumblr, Twitter / X, Vivino, WordPress.com, Zoho) and [GHunt](https://github.com/mxrch/GHunt) (public Google account info: Gaia ID, profile photo, last profile edit, Maps contributions, public Calendar, Play Games). Each check uses one public, unauthenticated signup or login signal and answers Found, Not Found or Couldn't check (blocked or changed, so unknown). Duolingo and Gravatar also return the profile link, username and, for Duolingo, the creation date.
+- Username: public profile checks in `email_checks.py` (Chess.com, Duolingo, GitHub, Gravatar: profile link, created and last active dates) and [Sherlock](https://github.com/sherlock-project/sherlock).
+
+## Self-test
+
+Sites change their signup APIs, so every email check is tested against a known registered address and a random unused one: `python selftest.py` locally, or `GET /api/selftest` on the app (cached for 30 minutes, HTTP 503 when a check is broken). The `Daily email check self-test` GitHub Actions workflow calls the deployed app every day and fails, listing the broken checks, when one stops working. To add a site, add a function and an `EMAIL_CHECKS` entry in `email_checks.py`, then run the self-test.
 
 ## Run
 
