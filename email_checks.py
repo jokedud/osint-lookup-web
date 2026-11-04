@@ -128,10 +128,12 @@ async def hubspot(client: httpx.AsyncClient, email: str) -> Finding:
         "https://api.hubspot.com/login-api/v1/login",
         json={"email": email, "password": "not-a-real-password", "rememberLogin": False},
     )
-    status = (_json(r) or {}).get("status")
+    data = _json(r)
+    status = data.get("status") if isinstance(data, dict) else None
     if status == "INVALID_USER":
         return Finding(NOT_FOUND, "HubSpot says the user does not exist")
-    if status:
+    # Blocked or rate-limited callers get "error" or LOGIN_IP_RATE_EXCEEDED.
+    if status and status != "error" and "RATE" not in status and r.status_code < 429:
         return Finding(FOUND, f"HubSpot recognises the address ({status})")
     return Finding(UNKNOWN, f"Unexpected response ({r.status_code})")
 
