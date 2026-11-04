@@ -11,6 +11,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
+from urllib.parse import quote
 
 import httpx
 
@@ -195,11 +196,13 @@ async def snapchat(client: httpx.AsyncClient, email: str) -> Finding:
 
 
 async def wordpress(client: httpx.AsyncClient, email: str) -> Finding:
-    r = await client.get(f"https://public-api.wordpress.com/rest/v1.1/users/{email}/auth-options")
-    data = _json(r) or {}
+    r = await client.get(f"https://public-api.wordpress.com/rest/v1.1/users/{quote(email, safe='@')}/auth-options")
+    data = _json(r)
+    if not isinstance(data, dict):
+        return Finding(UNKNOWN, f"Unexpected response ({r.status_code})")
     if data.get("error") == "unknown_user":
         return Finding(NOT_FOUND, "WordPress.com does not know this address")
-    if r.status_code in (200, 403):
+    if r.status_code == 200 or (r.status_code == 403 and data.get("error") == "email_login_not_allowed"):
         return Finding(FOUND, "WordPress.com recognises the address")
     return Finding(UNKNOWN, f"Unexpected response ({r.status_code})")
 
