@@ -28,6 +28,7 @@ async def run_email_checks(email: str):
 
 _selftest_cache = {"at": 0.0, "report": None}
 SELFTEST_CACHE_SECONDS = 1800
+_selftest_lock = asyncio.Lock()
 
 async def run_command(command: list[str], timeout: int = 90):
     try:
@@ -55,8 +56,9 @@ async def search(type: Literal["username", "email", "auto"] = Query("auto"), que
 @app.get("/api/selftest")
 async def selftest():
     """Run every email check against a registered and an unused address (cached for 30 minutes); 503 when a check is broken."""
-    if _selftest_cache["report"] is None or time.time() - _selftest_cache["at"] > SELFTEST_CACHE_SECONDS:
-        _selftest_cache["report"], _selftest_cache["at"] = await run_selftest(), time.time()
+    async with _selftest_lock:
+        if _selftest_cache["report"] is None or time.time() - _selftest_cache["at"] > SELFTEST_CACHE_SECONDS:
+            _selftest_cache["report"], _selftest_cache["at"] = await run_selftest(), time.time()
     report = _selftest_cache["report"]
     return JSONResponse(report, status_code=200 if report["ok"] else 503)
 
