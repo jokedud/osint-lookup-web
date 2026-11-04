@@ -2,7 +2,7 @@
 
 FastAPI app that checks where an email or username is registered.
 
-- Email: our own checks in `email_checks.py` (19 sites: Adobe, Atlassian, Chess.com, Codecademy, Duolingo, Firefox, GitHub (public commits by the address), Gravatar, HubSpot, Komoot, LastPass, Microsoft, Snapchat, Spotify, Tumblr, Twitter / X, Vivino, WordPress.com, Zoho) and [GHunt](https://github.com/mxrch/GHunt) (public Google account info: Gaia ID, profile photo, last profile edit, Maps contributions, public Calendar, Play Games). Each check uses one public, unauthenticated signup or login signal and answers Found, Not Found or Couldn't check (blocked or changed, so unknown). Duolingo, GitHub and Gravatar also return the profile link, username and, for Duolingo, the creation date.
+- Email: our own checks in `email_checks.py` (20 sites: Adobe, Atlassian, Chess.com, Codecademy, Duolingo, Firefox, GitHub (public commits by the address), Gravatar, HubSpot, Internet Archive, Komoot, LastPass, Microsoft, Snapchat, Spotify, Tumblr, Twitter / X, Vivino, WordPress.com, Zoho) and [GHunt](https://github.com/mxrch/GHunt) (public Google account info: Gaia ID, profile photo, last profile edit, Maps contributions, public Calendar, Play Games). Each check uses one public, unauthenticated signup or login signal and answers Found, Not Found or Couldn't check (blocked or changed, so unknown). Duolingo, GitHub and Gravatar also return the profile link, username and, for Duolingo, the creation date.
 - Username: public profile checks in `email_checks.py` (Chess.com, Duolingo, GitHub, Gravatar: profile link, created and last active dates) and [Sherlock](https://github.com/sherlock-project/sherlock).
 
 ## Self-test

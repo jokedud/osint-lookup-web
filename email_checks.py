@@ -344,6 +344,20 @@ async def github_commits(client: httpx.AsyncClient, email: str) -> Finding:
                    url=f"https://github.com/{owner}" if owner else None, last_seen=last_seen, extra=extra)
 
 
+async def internet_archive(client: httpx.AsyncClient, email: str) -> Finding:
+    r = await client.post(
+        "https://archive.org/services/xauthn/?op=login",
+        data={"email": email, "password": "not-a-real-password-0"},
+    )
+    data = _json(r)
+    reason = ((data or {}).get("values") or {}).get("reason") if isinstance(data, dict) else None
+    if reason == "account_not_found":
+        return Finding(NOT_FOUND, "No Internet Archive account")
+    if reason == "account_bad_password":
+        return Finding(FOUND, "Internet Archive account exists")
+    return Finding(UNKNOWN, f"Unexpected response ({r.status_code})")
+
+
 EMAIL_CHECKS: list[tuple[str, str, Callable[[httpx.AsyncClient, str], Awaitable[Finding]]]] = [
     ("Adobe", "adobe.com", adobe),
     ("Atlassian", "atlassian.com", atlassian),
@@ -354,6 +368,7 @@ EMAIL_CHECKS: list[tuple[str, str, Callable[[httpx.AsyncClient, str], Awaitable[
     ("GitHub", "github.com", github_commits),
     ("Gravatar", "gravatar.com", gravatar),
     ("HubSpot", "hubspot.com", hubspot),
+    ("Internet Archive", "archive.org", internet_archive),
     ("Komoot", "komoot.com", komoot),
     ("LastPass", "lastpass.com", lastpass),
     ("Microsoft", "microsoft.com", microsoft),
