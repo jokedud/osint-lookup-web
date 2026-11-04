@@ -418,9 +418,13 @@ async def _chess_user(client: httpx.AsyncClient, username: str) -> Finding:
 
 
 async def _duolingo_user(client: httpx.AsyncClient, username: str) -> Finding:
-    profile = await _duolingo_profile(client, username)
-    if not profile:
+    r = await client.get("https://www.duolingo.com/2017-06-30/users", params={"username": username})
+    data = _json(r)
+    if r.status_code != 200 or not isinstance(data, dict) or not isinstance(data.get("users"), list):
+        return Finding(UNKNOWN, f"Unexpected response ({r.status_code})")
+    if not data["users"] or not isinstance(data["users"][0], dict):
         return Finding(NOT_FOUND, "No Duolingo profile with this name")
+    profile = data["users"][0]
     extra = {k: profile.get(k) for k in ("name", "streak", "totalXp") if profile.get(k)}
     return Finding(
         FOUND, "Public Duolingo profile", url=f"https://www.duolingo.com/profile/{username}",
