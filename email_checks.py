@@ -317,6 +317,33 @@ async def gravatar(client: httpx.AsyncClient, email: str) -> Finding:
     )
 
 
+async def github_commits(client: httpx.AsyncClient, email: str) -> Finding:
+    r = await client.get(
+        "https://api.github.com/search/commits",
+        params={"q": f"author-email:{email}", "sort": "author-date", "order": "desc", "per_page": 30},
+        headers={"Accept": "application/vnd.github+json"},
+    )
+    data = _json(r)
+    if r.status_code != 200 or not isinstance(data, dict) or "total_count" not in data:
+        return Finding(UNKNOWN, f"Unexpected response ({r.status_code})")
+    items = data.get("items") or []
+    if not data["total_count"] or not items:
+        return Finding(NOT_FOUND, "No public GitHub commits by this address")
+    logins = [(i.get("author") or {}).get("login") for i in items]
+    login = next((l for l in logins if l), None)
+    repos = list(dict.fromkeys(i["repository"]["full_name"] for i in items if i.get("repository")))
+    extra = {"public commits": data["total_count"], "repos": ", ".join(repos[:5])}
+    last_seen = _ts(items[0]["commit"]["author"]["date"])
+    if login:
+        return Finding(FOUND, "Public GitHub commits by this address", url=f"https://github.com/{login}",
+                       username=login, last_seen=last_seen, extra=extra)
+    owner = repos[0].split("/")[0] if repos else None
+    if owner:
+        extra["note"] = f"address isn't linked to a GitHub login; commits are in repos owned by {owner}"
+    return Finding(FOUND, "Public GitHub commits by this address",
+                   url=f"https://github.com/{owner}" if owner else None, last_seen=last_seen, extra=extra)
+
+
 EMAIL_CHECKS: list[tuple[str, str, Callable[[httpx.AsyncClient, str], Awaitable[Finding]]]] = [
     ("Adobe", "adobe.com", adobe),
     ("Atlassian", "atlassian.com", atlassian),
@@ -324,6 +351,7 @@ EMAIL_CHECKS: list[tuple[str, str, Callable[[httpx.AsyncClient, str], Awaitable[
     ("Codecademy", "codecademy.com", codecademy),
     ("Duolingo", "duolingo.com", duolingo),
     ("Firefox", "accounts.firefox.com", firefox),
+    ("GitHub", "github.com", github_commits),
     ("Gravatar", "gravatar.com", gravatar),
     ("HubSpot", "hubspot.com", hubspot),
     ("Komoot", "komoot.com", komoot),
