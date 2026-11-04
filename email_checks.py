@@ -131,7 +131,7 @@ async def hubspot(client: httpx.AsyncClient, email: str) -> Finding:
     status = (_json(r) or {}).get("status")
     if status == "INVALID_USER":
         return Finding(NOT_FOUND, "HubSpot says the user does not exist")
-    if status:
+    if status and status.upper() != "ERROR" and r.status_code < 429:
         return Finding(FOUND, f"HubSpot recognises the address ({status})")
     return Finding(UNKNOWN, f"Unexpected response ({r.status_code})")
 
