@@ -7,7 +7,7 @@ FastAPI app that checks where an email or username is registered.
 
 ## Self-test
 
-Sites change their signup APIs, so every email check is tested against a known registered address and a random unused one: `python selftest.py` locally, or `GET /api/selftest` on the app (cached for 30 minutes, HTTP 503 when a check is broken). The `Daily email check self-test` GitHub Actions workflow calls the deployed app every day and fails, listing the broken checks, when one stops working. To add a site, add a function and an `EMAIL_CHECKS` entry in `email_checks.py`, then run the self-test.
+Sites change their signup APIs and the GHunt token can expire, so every email check and GHunt are tested against a known registered address and a random unused one (GHunt counts as broken when `GHUNT_MASTER_TOKEN` is missing or rejected): `python selftest.py` locally, or `GET /api/selftest` on the app (cached for 30 minutes, HTTP 503 when a check is broken). The `Daily email check self-test` GitHub Actions workflow calls the deployed app every day and fails, listing the broken checks, when one stops working. To add a site, add a function and an `EMAIL_CHECKS` entry in `email_checks.py`, then run the self-test.
 
 ## Run
 
