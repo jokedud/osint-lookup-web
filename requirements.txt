@@ -1,5 +1,5 @@
-fastapi
-uvicorn[standard]
-httpx
-sherlock-project
+fastapi==0.162.5
+uvicorn[standard]==0.54.0
+httpx==0.27.2
+sherlock-project==0.16.2
 ghunt @ git+https://github.com/mxrch/GHunt.git@5ee893929c51c7a8a665b199bbae04ce85a662b4
