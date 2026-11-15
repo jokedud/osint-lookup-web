@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 from typing import Literal
 import time
@@ -8,9 +9,10 @@ from email_checks import check_email, check_username
 from ghunt_check import run_ghunt
 from selftest import run_selftest
 
+logger = logging.getLogger("osint_lookup")
 app = FastAPI(title="OSINT Lookup", version="3.0.0")
-EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]{1,64}@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$")
+USERNAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 URL_RE = re.compile(r"https?://[^\s)]+", re.I)
 
 def clean_url(value):
@@ -24,7 +26,9 @@ async def run_email_checks(email: str):
     try:
         results = sorted(await check_email(email), key=lambda r: (STATUS_ORDER.get(r["status"], 1), r["platform"]))
         return {"status": "ok", "results": results, "checked": len(results)}
-    except Exception as exc: return {"status": "error", "results": [], "message": f"Email checks failed: {type(exc).__name__}: {exc}"}
+    except Exception:
+        logger.exception("Email checks failed")
+        return {"status": "error", "results": [], "message": "Email checks failed."}
 
 _selftest_cache = {"at": 0.0, "report": None}
 SELFTEST_CACHE_SECONDS = 1800
@@ -36,7 +40,8 @@ async def run_command(command: list[str], timeout: int = 90):
     except asyncio.TimeoutError: p.kill(); await p.wait(); return {"status": "timeout", "results": [], "message": "Lookup timed out."}
     except FileNotFoundError: return {"status": "unavailable", "results": [], "message": f"Lookup engine is not installed: {command[0]}"}
     lines = [x.strip() for x in stdout.decode(errors="replace").splitlines() if x.strip()]
-    return {"status": "ok" if p.returncode == 0 else "completed_with_warnings", "lines": lines, "stderr": stderr.decode(errors="replace")[-2000:] or None}
+    if stderr: logger.warning("%s stderr: %s", command[0], stderr.decode(errors="replace")[-2000:])
+    return {"status": "ok" if p.returncode == 0 else "completed_with_warnings", "lines": lines}
 
 @app.get("/api/search")
 async def search(type: Literal["username", "email", "auto"] = Query("auto"), query: str = Query(..., min_length=1, max_length=320)):
@@ -48,7 +53,7 @@ async def search(type: Literal["username", "email", "auto"] = Query("auto"), que
         checks["counts"] = {k: sum(r["status"] == k for r in checks["results"]) for k in STATUS_ORDER}
         return {"query": query, "type": detected, "engine": "Own email checks + GHunt", **checks, "ghunt_status": google["status"]}
     if not USERNAME_RE.fullmatch(query): raise HTTPException(400, "Use a username with letters, numbers, dots, underscores, or hyphens.")
-    profiles, raw = await asyncio.gather(check_username(query), run_command(["sherlock", query, "--print-found", "--no-color"])); lines = raw.pop("lines", [])
+    profiles, raw = await asyncio.gather(check_username(query), run_command(["sherlock", "--print-found", "--no-color", "--", query])); lines = raw.pop("lines", [])
     profiles = sorted((p for p in profiles if p["status"] != "not_found"), key=lambda r: STATUS_ORDER.get(r["status"], 1))
     raw["results"] = profiles + [{"platform": "Sherlock output", "status": "found", "label": "Results", "url": clean_url(x), "phone": None, "recovery_email": None, "detail": x} for x in lines]
     return {"query": query, "type": detected, "engine": "Profile checks + Sherlock", **raw}

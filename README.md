@@ -17,6 +17,8 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
+Tests (no network): `pip install pytest && python -m pytest tests`.
+
 GHunt needs Python 3.10+.
 
 ## GHunt setup

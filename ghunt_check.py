@@ -1,5 +1,6 @@
 """Google account lookup through GHunt, limited to public account info."""
 import asyncio
+import logging
 import os
 import tempfile
 import time
@@ -22,6 +23,7 @@ from ghunt.objects.base import GHuntCreds
 CREDS_PATH = Path(os.getenv("GHUNT_CREDS_PATH") or Path(tempfile.gettempdir()) / "ghunt" / "creds.m")
 RECHECK_SECONDS = 600
 PLATFORM = "Google Account (GHunt)"
+logger = logging.getLogger("osint_lookup")
 
 _lock = asyncio.Lock()
 _creds: GHuntCreds | None = None
@@ -137,4 +139,5 @@ async def run_ghunt(email: str, timeout: int = 60) -> dict[str, Any]:
     except (Exception, SystemExit) as exc:
         global _creds
         _creds = None
-        return {"status": "error", "results": [_card(PLATFORM, "unknown", "Error", f"GHunt lookup failed: {type(exc).__name__}: {exc}")]}
+        logger.exception("GHunt lookup failed")
+        return {"status": "error", "results": [_card(PLATFORM, "unknown", "Error", f"GHunt lookup failed ({type(exc).__name__}).")]}
