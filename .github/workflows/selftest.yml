@@ -17,7 +17,7 @@ jobs:
           python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import json
           r = json.load(open("report.json"))
-          print(f"**{r['passed']}/{r['total']} email checks working**\n")
+          print(f"**{r['passed']}/{r['total']} checks working (email checks + GHunt)**\n")
           print("| Check | Result | Problem |\n|---|---|---|")
           for row in r["results"]:
               print(f"| {row['check']} | {'pass' if row['ok'] else 'BROKEN'} | {row['problem'] or ''} |")
